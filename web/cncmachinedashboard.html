@@ -1,13 +1,26 @@
 <head>
-	<title>EtrO GUI</title>
+	<title>Laboratorio de Robotica - Poli - UFRJ</title>
 </head>
 
 <body>
 	<style>
-	body {background-color: #707070}
+   * {
+      border-radius: 5px;
+      margin-top: 2px;
+      margin-bottom: 2px;
+      margin-left: 2px;
+      margin-right: 2px;
+      font-family: Arial;
+      text-align: center;
+      color: #2f4168;
+   }
+	body {background-color: #f8f9fc}
   	canvas {
-     border: 1px solid black;
-     background: #808080;}
+     border: 1px solid #9ba7ec;
+     background-color: #ebeeff;
+     margin-left: auto;
+     margin-right: auto;
+   }
   	p {
      display: block;
      margin-top: 2px;
@@ -17,14 +30,17 @@
     div {
      margin-top: 5px;
      margin-bottom: 10px;
-     margin-left: 5;
-     margin-right: 5;
-     background-color: #606060;}
+     margin-left: auto;
+     margin-right: auto;
+     border: 2px solid #8998f0;
+     background-color: #c7cdee;}
 	</style>
 	
-	<div id="machine_dashboard" style="background-color:#757575">
-	<h1>Machine Dashboard</h1>
-    </div>
+	<div id="machine_dashboard" style="background-color:#c7cdee">
+      <img src="labrob_logo.JPG" alt="Lab Rob Logo">
+	<h1>Laboratorio de Robotica - Poli - UFRJ</h1>
+   <h3>CNC Machine Dashboard</h3>
+   </div>
 
     <script src="./eel.js"></script>
 	<script src="./cncmachinedashboard.js"></script>

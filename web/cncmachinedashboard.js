@@ -1,5 +1,5 @@
 
-function view_container_create(element_idtoset) {
+function dashboard_container_create(element_idtoset) {
     div_main = document.getElementById("machine_dashboard");
     canvas_toadd = document.createElement("CANVAS");
     canvas_toadd.id = "canvas_".concat(element_idtoset);
@@ -11,7 +11,7 @@ function view_container_create(element_idtoset) {
     div_to_add.id = "div_".concat(element_idtoset);
     
     title_para = document.createElement("p");
-    title_text = document.createTextNode(element_idtoset);
+    title_text = document.createTextNode(element_idtoset.replace("_", " "));
     
     script_injection = document.createElement('script');
     script_injection.setAttribute("type","text/javascript");
@@ -26,9 +26,9 @@ function view_container_create(element_idtoset) {
     div_main.appendChild(div_to_add);
 }
 
-view_container_create("terminal_gcode")
-view_container_create("monitor_serial")
-//view_container_create("monitor_machine")
+// dashboard_container_create("terminal_gcode")
+dashboard_container_create("monitor_serial")
+// dashboard_container_create("monitor_machine")
 
 
 

@@ -6,7 +6,7 @@ Created on Tue Oct 22 18:22:17 2019
 """
 import time
 import serial
-import serial.tools.list_ports as lp  # return a object list with serial ports information
+import serial.tools.list_ports as list_ports
 
 class serial_async_handler():
 
@@ -17,129 +17,66 @@ class serial_async_handler():
         #serial communication attributes
         self.setup_done = False
         self.bind_status = False
-        self.SerialPorts = []
-        self.serial_buffed_data = ''
-        self.Controller_hwid = ''
-        self.ControllerCOM = object  # var will be further overwrited with serial comunmicator instance
-        self.ControllerPortName = 'Null'  # Port Name 
-        self.datatable_len = 99
-        self.datatable = [[0,'label','message']]*self.datatable_len
-        self.datatable_ipos = 0  # Position to insert new messages
-        self.datatable_mcounter = 0  # message counter
-        self.feedback_word = 'ok'
-        self.waiting_feedback = 0
-        self.feedback_queued = []
-        self.monitor_data = []
-        self.monitor_timestamp = 0
+        self.serial_interface = False  # var will be further overwrited with serial comunmicator instance
+        self.ControllerPortName = ''  # Port Name 
 
-    def serial_devices_list(self):
-        serial_devices = []
-        self.SerialPorts = lp.comports()
-        for i in self.SerialPorts:
-            print('index: ',i,' hwid: ', i.hwid)
-            serial_devices.append(i.hwid)
-        return serial_devices
-        
-    def find_serial_device(self):
-        self.SerialPorts = lp.comports()
-        hwid_len = len(self.Controller_hwid)
-        if hwid_len <= 1:
-            print('hwid: "',self.Controller_hwid,'" is too short.')
-            return False
-        for i in self.SerialPorts:
-            if self.Controller_hwid == i.hwid[:hwid_len]:
-                self.ControllerPortName = i.name
-                print('Found Serial port for Controler with ',self.Controller_hwid,' hwid')
+        self.serial_buffed_data = b''
+        self.serial_towrite_data = []
+
+        self.datatable = [[[b'Empty',b'Empty']]*self.datatable_len]
+        self.datatable_len = 128
+        self.datatable_ipos = 0  # Position to insert new messages
+        self.datatable_mcounter = 0  # message counter       
+
+    def bind_serial_device(self, serial_device:str):
+        SerialPorts = list_ports.comports()
+        for sp in SerialPorts:
+            hwid = sp.hwid
+            if hwid.find(serial_device) > 0:
+                self.ControllerPortName = sp.name
+                print('Found Serial port for Controler with ', hwid, ' hwid')
+                self.serial_interface = serial.Serial(port=self.ControllerPortName, timeout=1)
+                print('Port: ',self.ControllerPortName, 'connected.')
+                settings_dict = self.serial_interface.getSettingsDict()
+                print(settings_dict)
+                self.serial_interface.apply_settings(settings_dict)
                 return True
-        print('Unable to find a Serial port with ',self.Controller_hwid,' hwid')
-        self.ControllerPortName = 'Null'
+        print('Unable to find a Serial port with ',serial_device,' in hwid')
         return False
 
-    def bind_communication(self):
-        ControllerPortName = self.ControllerPortName
-        if ControllerPortName == 'Null':
+    def write_from_towrite_data(self):
+        if len(self.serial_towrite_data) == 0 :
+            return False
+        data = self.serial_towrite_data.pop(0)
+        if data != bytes:
+            print('Data is not bytes.')
+            return False
+        try:
+            data = self.serial_towrite_data.pop(0)
+            self.serial_interface.write(data) #write data
+            self.datatable_insert_data(data, label=b'w:')
+            return True
+        except:
+            print('serial_interface failed to write:',data)
+            return False
+
+    def parse_read_buffer(self): 
+        readbuffer_size = self.serial_interface.in_waiting  # keep reading buffer until have less than this.
+        if readbuffer_size <= 0:
             return False
         else:
-            self.ControllerCOM = serial.Serial(port=ControllerPortName,
-                                               baudrate=250000, timeout=1)
-            print('Port: ',ControllerPortName, 'connected.')
-            return True
-
-    def write_serial(self,data,label='[w ]:'):
-        """ write data in binded serial device, if there is one.
-        """
-        if self.ControllerCOM == False: #serial availability checkpoint
-            print('Fail to write: ',data,' no device binded to write.')
-            return False
-        else:
-            try:
-                self.ControllerCOM.write(data) #write data
-                self.datatable_insert_data(data,label)
-                return True
-            except:
-                print('ControllerCOM failed to write.')
-                return False
-
-    def incomming_data_handler(self):
-        """it recoganizes messages with '\n' ending from serial_buffed_data 
-            and inserts it in datatable
-        """
-        new_data_flag = self.buffer_getnparse()
-        if new_data_flag is False:  # nothing to do.
-            return True
-        serial_buffed_data_l = self.serial_buffed_data
-        messages = []
-        message_piece = ''
-        for char in serial_buffed_data_l:  # looking char by char for frase stop char.
-            if char == '\n':
-                message_piece += '\n'
-                if len(message_piece) < 2:
-                    print('empty message in serial_buffed_data')
-                    return True
-                messages.append(message_piece)
-                message_piece = ''
-            else:
-                message_piece += char
-        if len(messages) > 0:  # messages found
-            for msg in messages:
-                self.datatable_insert_data(msg,'[r ]:')
-                self.feedback_logger(msg)
-        self.serial_buffed_data = message_piece  
+            data_piece = self.serial_interface.read(readbuffer_size)
+            self.serial_buffed_data.append(data_piece)
         return True
 
-    def buffer_getnparse(self): 
-        """ takes data from serial API buffer and copy it to memory scope buffer
-        The transposed data is ereased from source serial API buffer.
-        """
-        readbuffer_size = self.ControllerCOM.in_waiting  # keep reading buffer until have less than this.
-        if readbuffer_size == 0:
-            return False
-        data = ''
-        while readbuffer_size > 0:
-            data_piece = self.ControllerCOM.read(readbuffer_size)
-            data_piece = data_piece.decode('utf-8')
-            data += data_piece
-            if readbuffer_size > 850: #buffer was full
-                time.sleep(0.05) # give some time to incomming data
-            readbuffer_size = self.ControllerCOM.in_waiting
-        self.serial_buffed_data += data
-        return True
-
-    def datatable_insert_data(self, data:[bytes,str], label: str=''):
-        """Inserts data in datatable.
-        """
+    def datatable_insert_data(self, separator:bytes=b'\n', label:bytes=b''):
         label = label[:5]
-        if isinstance(data,bytes):
-            data = data.decode('utf-8')
-            data = [data]
-        elif isinstance(data,str):
-            data = [data]
-        # from here, data must be a list of string messages.
-        elif not isinstance(data,list):
-            print("failed to assure 'data' as list()")
-            return False
         ipos = self.datatable_ipos
         mcounter = self.datatable_mcounter
+        data = self.serial_buffed_data
+        data = data.split(separator)
+        if data[-1] == b'':
+            self.serial_buffed_data = []
         for message_i in data:
             self.datatable[ipos] = [mcounter,label,message_i]
             ipos += 1
@@ -149,76 +86,62 @@ class serial_async_handler():
         self.datatable_ipos = ipos
         self.datatable_mcounter = mcounter
         return True
+      
+    # def monitor_serial_update(self,return_data=True,size=20):
+    #     '''fill monitor_data with formated data from datatable to show in 
+    #     serial monitor.
+    #     Parameters:
+    #     ----------
+    #     return_data : bool, optional
+    #         True to return data, False to just update.
+    #     Returns:
+    #     -------
+    #     monitor_data_l : list
+    #         return updated monitor_data_l
+    #     True : bool
+    #         storing updated data in serial_async_handler.monitor_data
+    #     '''
+    #     # self.incomming_data_handler()
+    #     recent_messages = self.get_datatable_section(size)
+    #     monitor_data_l = []
+    #     for message in recent_messages:
+    #         nessage_str = message[1]+message[2]
+    #         if len(nessage_str) >= 80:
+    #             nessage_str = nessage_str[0:75]
+    #             nessage_str += ('[...]')
+    #         monitor_data_l.append(nessage_str)
+    #         if len(monitor_data_l) >= size:
+    #             break
+    #     self.monitor_data = monitor_data_l
+    #     if return_data == True:
+    #         return monitor_data_l
+    #     else:
+    #         return True
 
-    def feedback_logger(self,message=False):
-        if message.rfind(self.feedback_word) > -1:
-            self.feedback_queued.append(message)
-            
-    def feedback_get_status(self):
-        self.incomming_data_handler()
-        if len(self.feedback_queued) > 0:
-            feedback_message = self.feedback_queued.pop(0)
-            return feedback_message
-        elif len(self.feedback_queued) == 0:
-            return False
-        else:
-            return False
-        
-    def monitor_serial_update(self,return_data=True,size=20):
-        '''fill monitor_data with formated data from datatable to show in 
-        serial monitor.
-        Parameters:
-        ----------
-        return_data : bool, optional
-            True to return data, False to just update.
-        Returns:
-        -------
-        monitor_data_l : list
-            return updated monitor_data_l
-        True : bool
-            storing updated data in serial_async_handler.monitor_data
-        '''
-        # self.incomming_data_handler()
-        recent_messages = self.get_datatable_section(size)
-        monitor_data_l = []
-        for message in recent_messages:
-            nessage_str = message[1]+message[2]
-            if len(nessage_str) >= 80:
-                nessage_str = nessage_str[0:75]
-                nessage_str += ('[...]')
-            monitor_data_l.append(nessage_str)
-            if len(monitor_data_l) >= size:
-                break
-        self.monitor_data = monitor_data_l
-        if return_data == True:
-            return monitor_data_l
-        else:
-            return True
-
-    def get_datatable_section(self, size):
-        if size > self.datatable_len:
-            size = self.datatable_len - 1
-        msg_pos = self.datatable_ipos - 1
-        datatable_l = []
-        for i in range(size):
-            datatable_l.append(self.datatable[msg_pos])
-            msg_pos += -1
-        return datatable_l
+    # def get_datatable_section(self, size):
+    #     if size > self.datatable_len:
+    #         size = self.datatable_len - 1
+    #     msg_pos = self.datatable_ipos - 1
+    #     datatable_l = []
+    #     for i in range(size):
+    #         datatable_l.append(self.datatable[msg_pos])
+    #         msg_pos += -1
+    #     return datatable_l
     
-    def monitor_serial_get_data(self,requested_size):
-        if self.waiting_feedback == 0:
-            self.incomming_data_handler()
-        self.monitor_serial_update(size=requested_size)
-        return self.monitor_data
+    # def monitor_serial_get_data(self,requested_size):
+    #     if self.waiting_feedback == 0:
+    #         self.incomming_data_handler()
+    #     self.monitor_serial_update(size=requested_size)
+    #     return self.monitor_data
 
     def serial_dump(self):
-        self.ControllerCOM.reset_input_buffer()
+        self.serial_interface.reset_input_buffer()
         return True
     
     def serial_close(self):
         try:
             time.sleep(0.5)
-            self.ControllerCOM.close()
+            self.serial_interface.close()
             time.sleep(0.5)
             self.__init__()
             print('Serial connection closed.')
@@ -227,18 +150,10 @@ class serial_async_handler():
             print('Failed to close serial connection.')
             return False
 
-    def run(self):
-        self.setup()
-
-    def setup(self):
-        self.find_serial_device()
-        self.bind_status = self.bind_communication()
-        self.setup_done = True
+sc = serial_async_handler()
+sc.bind_serial_device(serial_device='1A86:7523')
 
 
-ser = serial_async_handler()
-ser.Controller_hwid = 'USB VID:PID=1A86'
-ser.setup()
 
 
 
