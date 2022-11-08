@@ -1,5 +1,7 @@
 <head>
 	<title>Laboratorio de Robotica - Poli - UFRJ</title>
+   <link rel="stylesheet" href="https://pyscript.net/alpha/pyscript.css"/>
+   <script defer src="https://pyscript.net/alpha/pyscript.js"></script>
 </head>
 
 <body>
@@ -40,8 +42,13 @@
       <img src="labrob_logo.JPG" alt="Lab Rob Logo">
 	<h1>Laboratorio de Robotica - Poli - UFRJ</h1>
    <h3>CNC Machine Dashboard</h3>
+   <div>
+      <h3>Terminal Python</h3>
+      <py-repl></py-repl>
+      <py-script>
+         import serial
+      </py-script>
+   </div>
    </div>
 
-    <script src="./eel.js"></script>
-	<script src="./cncmachinedashboard.js"></script>
 </body>
