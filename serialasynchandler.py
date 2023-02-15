@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Created on Tue Oct 22 18:22:17 2019
+Created on Tue Oct 22 18:22:17 2022
 
-@author: henrique.ferreira
+@author: henrique hafner
 """
 import time
 import serial
 
-class serial_async_handler:
+class SerialAsyncHandler:
 
     def __init__(self):
         self.vars_constructor()
@@ -20,16 +20,21 @@ class serial_async_handler:
         self.serial_interface = object  # var will be further overwrited with serial comunmicator instance
         self.ControllerPortName = ''  # Port Name
         self.comunicator_state = 0
+        self.settings_dict = dict()
 
         self.read_buffer = ''
         self.towrite_buffer = []
-        self.msglog_len = 1024
-        self.msglog = [['','']]*self.msglog_len
+        self.msglog_lines = 128
+        self.msglogline = ["",""]
+        self.msglog = list(range(self.msglog_lines))
+        for i in range(self.msglog_lines):
+            self.msglog[i] = self.msglogline.copy()
         self.msglog_ipos = 0  # Position to insert new messages
         self.msglog_mcounter = 0  # message counter       
 
     def bind_serial_device(self, serial_device:str):
-        serial_ports = self.serial_module.tools.list_ports.comports()
+        from serial.tools import list_ports
+        serial_ports = list_ports.comports()
         for sp in serial_ports:
             hwid = sp.hwid
             if hwid.find(serial_device) > 0:
@@ -37,9 +42,10 @@ class serial_async_handler:
                 print('Found Serial port for Controler with ', hwid, ' hwid')
                 self.serial_interface = self.serial_module.Serial(port=self.ControllerPortName, timeout=1)
                 print('Port: ',self.ControllerPortName, 'connected.')
-                settings_dict = self.serial_interface.getSettingsDict()
-                print(settings_dict)
-                self.serial_interface.apply_settings(settings_dict)
+                self.settings_dict = self.serial_interface.getSettingsDict()
+                print(self.settings_dict)
+                self.setup_done = True
+                self.bind_status = True
                 return True
         print('Unable to find a Serial port with ',serial_device,' in hwid')
         return False
@@ -55,13 +61,28 @@ class serial_async_handler:
             self.messagelog_insert_data(data, label='w:')
             return True
         except:
+            failure_message = "serial_interface failed to write"
+            self.messagelog_insert_data(failure_message, label='e:')
+            if not self.setup_done:
+                setup_error = "serial_interface setup pending"
+                self.messagelog_insert_data(setup_error, label='e:')
             print('serial_interface failed to write:',data)
             return False
 
     def parse_interface_read_buffer(self):
         counter_bytes_to_read = self.serial_interface.inWaiting()
         if counter_bytes_to_read > 0:
-            self.read_buffer += bytes.decode(self.serial_interface.read())
+            try:
+                bytes_read = self.serial_interface.read()
+            except:
+                failure_message = "serial_interface failed to read"
+                self.messagelog_insert_data(failure_message, label='e:')
+                if not self.setup_done:
+                    setup_error = "serial_interface setup pending"
+                    self.messagelog_insert_data(setup_error, label='e:')
+                print('serial_interface failed to read')
+                return False
+            self.read_buffer += bytes.decode(bytes_read)
         return True
 
     def parse_messages_from_async_buffer(self, message_separator = '\n'):
@@ -81,23 +102,38 @@ class serial_async_handler:
         label = label[:5]
         if type(message) is bytes:
             message = message.decode()
+        if len(message) >= 65:
+            message = message[:59] + '[...]'
         self.msglog[self.msglog_ipos] = [label,message]
         self.msglog_ipos += 1
         self.msglog_mcounter += 1
         if self.msglog_ipos >= self.msglog_len:  #preventing out of range index
             self.msglog_ipos = 0
         return True
-            
+    
+    def get_messagelog_window(self,window_lines_size=20):
+        window_lines_size = min(window_lines_size, self.msglog_lines)
+        star_index = self.msglog_ipos
+        end_index = star_index-window_lines_size
+        if end_index >= 0 :
+                messagelog_window = self.msglog[end_index:star_index]
+        if end_index <  0 :        
+                messagelog_window = self.msglog[end_index:] + self.msglog[:star_index]
+        return messagelog_window
+    
     def serial_dump(self):
-        self.serial_interface.reset_input_buffer()
-        return True
+        try:
+            self.serial_interface.reset_input_buffer()
+            return True
+        except:
+            return False
     
     def serial_close(self):
         try:
             time.sleep(0.5)
             self.serial_interface.close()
             time.sleep(0.5)
-            self.__init__()
+            self.vars_constructor()
             print('Serial connection closed.')
             return True
         except:
@@ -111,7 +147,7 @@ class serial_async_handler:
 # test with ghost
 def tester_1():
     import serialTester
-    sc = serial_async_handler()
+    sc = SerialAsyncHandler()
     sc.serial_interface = serialTester
     sc.setup_done = True
     sc.bind_status = True

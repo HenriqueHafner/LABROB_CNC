@@ -1,48 +1,64 @@
 #gui backend
 # -*- coding: utf-8 -*-
 """ Created on Wed Nov 26 01:21:33 2020 @author: henriquehafner@poli.ufrj.br """
-import eel
-  
-class gui():
+
+import threading
+
+class GUI():
     
     def __init__(self):
-        self.machine_interface_obj = None
-        self.gdws = 11 
-        self.gcode_display = ['-']*self.gdws     
+        self.machine_core_instance_reference = object()
+        self.eel = object()
     
-    def run_webserver(self):
-        eel.init('web')
+    def setup_websocket(self):
+        import eel as eel_module
+        self.eel = eel_module
+        self.eel.expose(self.arbitrary_call)
+        self.eel.expose(self.get_last_messages_window)
+        
+    def run_eel_webserver(self):
+        self.setup_websocket()
+        self.eel.init('web')
         print('EtrO App webserver starting..')
-        eel.start('cncmachinedashboard.html',port=80)
+        self.eel.start('cncmachinedashboard.html',port=80)
         print('EtrO App webserver Closed..')
         return None
     
-    def set_machine_interface(self,target_object):
-        self.machine_interface_obj = target_object
+    def run_webserver_thread(self):
+        self.webserver_thread = threading.Thread(name='webserver_tread', target=self.run_eel_webserver)
+        self.webserver_thread.start()
     
-    def update_terminal_gcode(self): #gdws is gcode_display_window_size , need to be odd number
-        #gdwi , gcode_display_window_index , is a list with 'gdws' size.
-        gdwi = [self.machine_interface_obj.gcode_data[1]]*self.gdws 
-        display_gcode_shift = [] #gcode index shifter to display window
-        for i in range(self.gdws):
-            display_gcode_shift.append(int(i-((self.gdws/2)-0.5))) #computing index
-        for i in range(self.gdws):
-            element_index = gdwi[i]+display_gcode_shift[i]
-            if element_index >= 0 \
-            and element_index < self.machine_interface_obj.gcode_data[3]:
-                self.gcode_display[i] = str(element_index) + \
-                ' : ' + self.machine_interface_obj.gcode_data[0][element_index]
-            else:
-                self.gcode_display[i] = ''
-        return self.gcode_display
+    def set_machine_interface_reference(self, target_object):
+        self.machine_core_instance_reference = target_object
     
-    def call_terminal_gcode(self,call_message):
-        data = self.machine_interface_obj.terminal_gcode_caller(call_message)
-        return data
+    def buttons_teminal_gcode(self):
+        buttons_data = [
+            ["Enviar Linhas ao programa", "get_GCODE_from_gui()"],
+            ["Do a test call", "test_call()"],
+            ]
+        return buttons_data
     
-    def update_monitor_serial(self):
-        return self.machine_interface_obj.monitor_serial_update()
-    
-    def update_monitor_machine(self):
-        return self.machine_interface_obj.monitor_machine_update()
-    
+    def get_last_messages_window(self):
+        messages_window_raw = self.machine_core_instance_reference.get_messagelog_window()
+        messages_window = list(range(20))
+        for i in range(20):
+            messages_window[i] = messages_window_raw[i][0] + messages_window_raw[i][1]
+        return messages_window
+
+    def test_call(self):
+        print("JavasScript asked for a handshake, proceeding to handshake.")
+        return "Python accepted handshake."
+
+    def arbitrary_call(self, call_message):
+        try:
+            call_message = "self."+call_message
+            eval_return = eval(call_message)
+            return eval_return
+        except Exception as e:
+            print("Failed to call: ", call_message)
+            print(e)
+            error_return = int(-1)
+            return error_return
+
+# GUI_instance = GUI()
+# GUI_instance.run_webserver()

@@ -129,11 +129,6 @@ class machine_interface():
             else:
                 print("No .gcode file found in ",gcode_datas_dir_l)
                 return False
-        # elif type(arg_def) == list: #set a path in index 0 and file name in index 1
-        #     gcode_data_name_l = arg_def[1]
-        #     gcode_datas_dir_l = arg_def[0]           
-        #     gcode_datas_list_l=[os.path.join(gcode_datas_dir_l, 
-        #                                      gcode_data_name_l)]
         else:
             print('Unexpected arg_def argument.')
             return False

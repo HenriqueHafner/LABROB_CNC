@@ -163,7 +163,6 @@ eel = {
 };
 
 eel._init();
-
 if(typeof require !== 'undefined'){
     // Avoid name collisions when using Electron, so jQuery etc work normally
     window.nodeRequire = require;
@@ -171,3 +170,5 @@ if(typeof require !== 'undefined'){
     delete window.exports;
     delete window.module;
 }
+
+

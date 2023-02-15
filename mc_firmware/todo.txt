@@ -1,0 +1,5 @@
+função que lê 1 char serial e coloca no buffer até encontrar um linebreak ou chegar no limite
+
+função que lê o buffer e recorta os pedaços de G-code
+
+função que interpreta os pedaços de g-code e executa.
