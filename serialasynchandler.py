@@ -6,8 +6,9 @@ Created on Tue Oct 22 18:22:17 2022
 """
 import time
 import serial
+import threading
 
-class SerialAsyncHandler:
+class serialasynchandler_core:
 
     def __init__(self):
         self.vars_constructor()
@@ -30,7 +31,10 @@ class SerialAsyncHandler:
         for i in range(self.msglog_lines):
             self.msglog[i] = self.msglogline.copy()
         self.msglog_ipos = 0  # Position to insert new messages
-        self.msglog_mcounter = 0  # message counter       
+        self.msglog_mcounter = 1000  # message counter
+        self.loop_stopped = True
+        self.loop_events_thread = threading.Thread(name='serial_loop_events', target=self.loop_events)
+        self.loop_events_thread.start()
 
     def bind_serial_device(self, serial_device:str):
         from serial.tools import list_ports
@@ -46,6 +50,8 @@ class SerialAsyncHandler:
                 print(self.settings_dict)
                 self.setup_done = True
                 self.bind_status = True
+                time.sleep(0.5)
+                self.serial_dump()
                 return True
         print('Unable to find a Serial port with ',serial_device,' in hwid')
         return False
@@ -93,21 +99,39 @@ class SerialAsyncHandler:
             if char == message_separator:
                 messages_found += [current_message_buffer]
                 current_message_buffer = ''
-        self.read_buffer = current_message_buffer
+        self.read_buffer = current_message_buffer # keep the residue in read_buffer
+        if messages_found == []:
+            return False
         for message in messages_found:
             self.messagelog_insert_data(message, label = 'r: ')
         return True
 
+    def towrite_buffer_append(self, messages):
+        try:
+            if type(messages) is not list:
+                messages = [messages]
+            self.towrite_buffer += messages
+            return True
+        except:
+            print("failed buff messages.")
+            print(messages)
+            return False
+
     def messagelog_insert_data(self, message, label:str ='null'):
+        self.msglog_mcounter = self.msglog_mcounter + 1
+        if self.msglog_mcounter >= 2000:
+            self.msglog_mcounter = 1001
+        counter = str(self.msglog_mcounter)
+        counter = counter[-3:]
         label = label[:5]
+        prefix = counter+' '+label
         if type(message) is bytes:
             message = message.decode()
         if len(message) >= 65:
-            message = message[:59] + '[...]'
-        self.msglog[self.msglog_ipos] = [label,message]
+            message = message[:55] + '[...]'
+        self.msglog[self.msglog_ipos] = [prefix,message]
         self.msglog_ipos += 1
-        self.msglog_mcounter += 1
-        if self.msglog_ipos >= self.msglog_len:  #preventing out of range index
+        if self.msglog_ipos >= self.msglog_lines-1:  #preventing out of range index
             self.msglog_ipos = 0
         return True
     
@@ -128,6 +152,13 @@ class SerialAsyncHandler:
         except:
             return False
     
+    def loop_events(self):
+        while True:
+            if not self.loop_stopped:
+                self.write_from_towrite_buffer()
+                self.parse_interface_read_buffer()
+                self.parse_messages_from_async_buffer()
+    
     def serial_close(self):
         try:
             time.sleep(0.5)
@@ -144,13 +175,9 @@ class SerialAsyncHandler:
 # Tester
 ###
 
-# test with ghost
-def tester_1():
-    import serialTester
-    sc = SerialAsyncHandler()
-    sc.serial_interface = serialTester
-    sc.setup_done = True
-    sc.bind_status = True
+def tester():
+    sc = serialasynchandler_core()
+    sc.bind_serial_device(serial_device='1A86:7523')
     for i in range(6):
         sc.write_from_towrite_buffer()
         sc.parse_interface_read_buffer()
@@ -158,10 +185,6 @@ def tester_1():
         sc.towrite_buffer += [b'teste\n']
     print(sc.msglog[:20])
     return True
-
-# test with real serial inerface
-#sc = serial_async_handler()
-# sc.bind_serial_device(serial_device='1A86:7523')
 
 
 

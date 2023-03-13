@@ -15,7 +15,7 @@ class terminal_gcode {
         this.div_main.appendChild(this.canvas);
         this.message_console_timestamp = Date.now()
         this.message_data = Array(20)
-        // setInterval(function() { obj_terminal_gcode.update_messages_window(obj_terminal_gcode) }, 200);
+        setInterval(function() { obj_terminal_gcode.update_messages_window(obj_terminal_gcode) }, 200);
     }
 
     setup_html_inputfield() {
@@ -27,18 +27,19 @@ class terminal_gcode {
         this.input_field_html.style.height = 515;
         this.input_field_html.style.alignItems = "center";
         this.input_field_html.style.backgroundColor = "white";
-        this.div_main.appendChild(this.input_field_html);
+        this.div_main.appendChild(this.input_field_html);        
         this.setup_interface_buttons();
     }
 
     get_inputfield_data() {
         var input_field = this.input_field_html.contentDocument.getElementById("lined_input")
-        window.alert(input_field.value)
-        return true
+        var str_gcode_message = input_field.value
+        input_field.value = ""
+        return str_gcode_message
     }
 
     async ell_python_exposed_fun_call(python_call) {
-        let return_data = await eel.arbitrary_call(python_call)();
+        let return_data = await globalThis.eel.arbitrary_call(python_call)();
         return return_data
     }
 
@@ -47,14 +48,7 @@ class terminal_gcode {
         var div_buttons = document.createElement("DIV");
         div_buttons.id = "buttons_".concat(this.id_parent_label);
         var obj_scope = this;
-
-        var button = document.createElement("BUTTON");
-        button.type = "button";
-        button.innerHTML = "Enviar linhas do editor";
-        button.id = "button_frontend_send_gcode";
-        button.onclick = function() {obj_scope.get_inputfield_data()};
-        div_buttons.appendChild(button);
-        
+       
         for (var button_data_index in interface_data) {
             var label = interface_data[button_data_index][0];
             var call  = interface_data[button_data_index][1];
@@ -93,7 +87,13 @@ class terminal_gcode {
 
 }
 
+
 var obj_terminal_gcode = new terminal_gcode();
+function get_inputfield_data() {
+    var message = obj_terminal_gcode.get_inputfield_data()
+    return message
+};
+eel.expose(get_inputfield_data);
 
 
 

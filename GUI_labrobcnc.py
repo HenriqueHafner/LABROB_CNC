@@ -7,7 +7,7 @@ import threading
 class GUI():
     
     def __init__(self):
-        self.machine_core_instance_reference = object()
+        self.machine_core_reference = object()
         self.eel = object()
     
     def setup_websocket(self):
@@ -28,22 +28,31 @@ class GUI():
         self.webserver_thread = threading.Thread(name='webserver_tread', target=self.run_eel_webserver)
         self.webserver_thread.start()
     
-    def set_machine_interface_reference(self, target_object):
-        self.machine_core_instance_reference = target_object
+    def set_core_reference(self, target_object):
+        self.machine_core_reference = target_object
     
     def buttons_teminal_gcode(self):
         buttons_data = [
-            ["Enviar Linhas ao programa", "get_GCODE_from_gui()"],
+            ["Enviar Linhas para controlador", "str_gcode_parse_gui()"],
             ["Do a test call", "test_call()"],
             ]
         return buttons_data
     
     def get_last_messages_window(self):
-        messages_window_raw = self.machine_core_instance_reference.get_messagelog_window()
+        messages_window_raw = self.machine_core_reference.get_messagelog_window()
         messages_window = list(range(20))
         for i in range(20):
             messages_window[i] = messages_window_raw[i][0] + messages_window_raw[i][1]
         return messages_window
+
+    def str_gcode_parse_gui(self):
+        gcode_text = self.eel.get_inputfield_data()()
+        print("parsing...")
+        print(gcode_text)
+        print("...")
+        commands = self.machine_core_reference.gcode_parse(gcode_text)
+        print(commands)
+        return True
 
     def test_call(self):
         print("JavasScript asked for a handshake, proceeding to handshake.")
