@@ -19,17 +19,18 @@ int trimpot_1 = 512;
 
   //movement
 bool able_to_step = true;
+bool motion_idle = true;
 bool step_state[] = { LOW, LOW, LOW };
 int  dir_pins[]   = { dir_pin_x,  dir_pin_y,  dir_pin_z };
 int  step_pins[]  = { step_pin_x, step_pin_y, step_pin_z};
 bool dir_state[]  = { LOW, LOW, LOW };
-int steps_goal[]               = { 0,  0,  0 };
-int steps_done[]               = { 0,  0,  0 };
-int steps_remainning[]         = { 0,  0,  0 };
+unsigned int   steps_target[]        = { 0,  0,  0 };
+unsigned int   steps_done[]          = { 0,  0,  0 };
+unsigned int   steps_remainning[]    = { 0,  0,  0 };
+float steps_fraction_residue[] = { 0,  0,  0 };
 float steps_tangent_relation[] = { 0,  0,  0 };
-float steps_goal_distance[]    = { 0,  0,  0 };
 int axis_carrier  = 0;
-bool should_step[] = { false, false, false};
+bool should_step[] = { false, false, false };
 
   //communication
 String message;
@@ -62,18 +63,103 @@ void loop() {
   serial_incoming_message_parser();
   print_order_state();
   step_handler();
-  delay(0);
+  delay(10);
 }
 
-  // ##################### Global Methods - Begin #####################
-  
-bool isUnsignedInt(String input) {
-  for (unsigned int i = 0; i < input.length(); i++) {
-    if (!isDigit(input[i])) {
-      return false;
+// ##################### Global Methods - Begin #####################
+
+  // communication messages processing 
+
+bool message_decode(String message_i) {
+  int i_max =  message_i.length();
+  int i = 0;
+  set_zero_steps_target();
+  while (i <= i_max-2 ) {
+    // get axis, dir and steps from a order
+    if ( (isAlpha(message_i.charAt(i))) ) {
+      int axis = get_axisid_from_char(message_i.charAt(i));
+      int dir  = get_dir_from_char(message_i.charAt(i+1));
+      int string_steps_start = i+2;
+      i = string_steps_start;
+      while ( (i+1 <= i_max) && (isDigit(message_i.charAt(i+1))) ) {
+        i = i+1;
+      }
+      int string_steps_end = i;
+      unsigned int steps = get_steps_from_string(message_i, string_steps_start, string_steps_end);
+      //check message health
+      bool message_health_flag = check_inputs(axis, dir, steps);
+      if (!message_health_flag) {
+        Serial.print("Failed to decode message: ");
+        Serial.println(message_i);
+        Serial.println(axis);
+        Serial.println(dir);
+        Serial.println(steps);
+        return false;
+      } else {
+        //set the command from this piece
+        set_steps_target(axis, dir, steps);
+      }
+    }
+  i = i + 1; //keep searching for other order in message
+  }
+  setup_steps_planning();
+  return true;
+}
+
+bool check_String_is_unsigned_int(String input) {
+  bool is_UI_flag = true;
+  int input_length = input.length();
+  if (input_length <= 0) {
+    is_UI_flag = false;
+    Serial.print("Input steps length error.");
+  }
+  if (input_length > 5) {
+    is_UI_flag = false;
+    Serial.print("Input steps length overflow.");
+  }
+  if (input_length == 5) {
+    String high_3_digits_text = input.substring(0,3);
+    int high_3_digits = high_3_digits_text.toInt();
+    if (high_3_digits > 654) {
+      is_UI_flag = false;
+      Serial.print("Input steps value overflow: ");
+      Serial.println(high_3_digits);
     }
   }
-  return true;
+  for (unsigned int i = 0; i < input_length; i++) {
+    if (!isDigit(input[i])) {
+      Serial.print("Input steps has non digit char");
+      is_UI_flag = false;
+    }
+  }
+  return is_UI_flag;
+}
+
+unsigned int String_to_unsigned_int(String input) {
+  unsigned int error_value = 0;
+  unsigned int sum_value = 0;
+  int input_length = input.length();
+  if (!check_String_is_unsigned_int(input)){
+    return error_value;
+  }
+  char char_i = '0';
+  int  digit_i = 0;
+  int decimal_power_i = 0;
+  decimal_power_i = max(0,  input_length-1);
+  decimal_power_i = min(4, decimal_power_i);
+
+  for (unsigned int i = 0; i < input_length; i++) {
+   char_i = input.charAt(i);
+   digit_i = char_i-'0';
+   sum_value += digit_i*int_pow_10_limited(decimal_power_i);
+   decimal_power_i--;
+  }
+  return sum_value;
+}
+
+int int_pow_10_limited(int x) {
+    static const int powers[] = {1, 10, 100, 1000, 10000, 100000};
+    return powers[x];
 }
 
 int get_axisid_from_char(char message_piece) {
@@ -109,81 +195,38 @@ int get_dir_from_char(char message_piece){
   return dir;
   }
 
-int get_steps_from_string(String message_i, int start_i, int end_i) {
+unsigned int get_steps_from_string(String message_i, int start_i, int end_i) {
+  unsigned int steps = 0;
   if (start_i <= end_i) {
     String message_piece = message_i.substring(start_i, end_i+1);
-    int steps;
-    if (isUnsignedInt(message_piece)) {
-      steps = message_piece.toInt();
-      if (steps>0) {
-        return steps;
-      } else {
-      Serial.println("Steps order overflow");
-      }
-    }
+    steps = String_to_unsigned_int(message_piece);
   }
-  return -1;
+  return steps;
 }
 
+ // Motion planning 
 
-void set_steps_to_do(int axis_id, int dir_i, int steps_i){
+void set_steps_target(int axis_id, int dir_i, unsigned int steps_i){
   dir_state[axis_id]  = dir_i;
-  steps_goal[axis_id] = steps_i;
+  digitalWrite(dir_pins[axis_id], dir_i);
+  steps_target[axis_id] = steps_i;
 }
 
-bool check_inputs(int input1, int input2, int input3) {
-  if ((input1 == -1) || (input2 == -1) || (input3 == -1) ) {
-    return true;
-  } else {
-    return false;
+bool check_inputs(int axis_id, int dir_i, unsigned int steps_i) {
+  bool input_ok_flag = true;
+  if (axis_id < 0 || axis_id > 2 )  {
+    input_ok_flag = false;
   }
-}
-
-bool message_decode(String message_i) {
-  int i_max =  message_i.length();
-  int i = 0;
-  int axis  = -1;
-  int dir   = -1;
-  int string_steps_start = -1;
-  int string_steps_end = -1;
-  int steps = -1;
-  while (i <= i_max-2 ) {
-    // get axis, dir and steps from a order
-    if ( (isAlpha(message_i.charAt(i))) ) {
-      axis = get_axisid_from_char(message_i.charAt(i));
-      dir  = get_dir_from_char(message_i.charAt(i+1));
-      i = i+2;
-      string_steps_start = i;
-      while ( (i <  i_max) && (isDigit(message_i.charAt(i+1))) ) {
-        i = i+1;
-      }
-      string_steps_end = i;
-    steps = get_steps_from_string(message_i, string_steps_start, string_steps_end);
-    }
-    //check message health
-    bool message_corrupted_flag = check_inputs(axis, dir, steps);
-    if (message_corrupted_flag) {
-      Serial.print("Failed to decode message: ");
-      Serial.println(message_i);
-      Serial.println(axis);
-      Serial.println(dir);
-      Serial.println(steps);
-      return false;
-    } else {
-      set_steps_to_do(axis, dir, steps);
-      axis  = -1;
-      dir   = -1;
-      string_steps_start = -1;
-      string_steps_end = -1;
-      steps = -1;
-    }
-  i = i + 1; //keep searching for other order in message
+  if (dir_i < 0 || dir_i > 1) {
+    input_ok_flag = false;
   }
-  setup_steps_planning();
-  return true;
+  if (steps_i <= 0) {
+    input_ok_flag = false;
+  }
+  return input_ok_flag;
 }
 
-void indle_interval_update(bool debug=false) {
+void idle_interval_update(bool debug=false) {
   trimpot_1 = 1025-analogRead(analog_pot_1);
   step_curr_interv = map(trimpot_1,1,1023,step_min_interv,step_max_interv);
   if (debug==true){
@@ -200,32 +243,38 @@ void setup_steps_planning() {
   set_steps_remainning();
 }
 
-void set_inital_values() {
+void set_zero_steps_done() {
   for ( int axis_i = 0 ; axis_i<3 ; axis_i++) {
     steps_done[axis_i] = 0;
+  }
+}
+
+void set_zero_steps_target() {
+  for ( int axis_i = 0 ; axis_i<3 ; axis_i++) {
+    steps_target[axis_i] = 0;
   }
 }
 
 void set_axis_carrier() {
   int biggest_steps = 0;
   for ( int axis_i = 0 ; axis_i<3 ; axis_i++) {
-    if (steps_goal[axis_i] > biggest_steps) {
-      biggest_steps = steps_goal[axis_i];
+    if (steps_target[axis_i] > biggest_steps) {
+      biggest_steps = steps_target[axis_i];
       axis_carrier  = axis_i;
     }
   }
 }
 
 void set_carrier_tangent_relation() {
-  float maximum_goal = steps_goal[axis_carrier];
+  float maximum_goal = steps_target[axis_carrier];
   for ( int axis_i = 0 ; axis_i<3 ; axis_i++) {
-    steps_tangent_relation[axis_i] = steps_goal[axis_i]/maximum_goal;
+    steps_tangent_relation[axis_i] = steps_target[axis_i]/maximum_goal;
   }
 }
 
 void set_steps_remainning() {
   for ( int axis_i = 0 ; axis_i<3 ; axis_i++) {
-  steps_remainning[axis_i] = steps_goal[axis_i] - steps_done[axis_i];
+  steps_remainning[axis_i] = steps_target[axis_i] - steps_done[axis_i];
   }
 }
 
@@ -233,12 +282,13 @@ bool step_handler() {
   if ( millis() - step_last_timestamp <= step_curr_interv ) {
     return true;
   }
-
+  motion_idle = true;
   for ( int axis_i = 0 ; axis_i<3 ; axis_i++) {
-    steps_goal_distance[axis_i] = (steps_tangent_relation[axis_i])*(1+steps_done[axis_carrier]) - steps_done[axis_i];
-    should_step[axis_i] = ( (steps_remainning[axis_i] > 0) && ( steps_goal_distance[axis_i] >= 1 ) );
+    steps_fraction_residue[axis_i] = (steps_tangent_relation[axis_i])*(1+steps_done[axis_carrier]) - steps_done[axis_i];
+    should_step[axis_i] = ( (steps_remainning[axis_i] > 0) && ( steps_fraction_residue[axis_i] >= 1 ) );
     if (should_step[axis_i] && able_to_step) {
       step_axis(axis_i);
+      motion_idle = false;
     }
   }
   step_last_timestamp = millis();
@@ -252,21 +302,16 @@ void step_axis(int axis_i) {
   steps_remainning[axis_i]-- ;
 }
 
-bool serial_incoming_message_parser() {
-  String message;
-  String idle = "Idle";
+void serial_incoming_message_parser() {
   serial_bytes_in_buffer = Serial.available();
   if (serial_bytes_in_buffer > 0) {
     message = Serial.readStringUntil('\n');
-
     serial_bytes_in_buffer = Serial.available();
     Serial.print("B01 ");
     Serial.print(serial_bytes_in_buffer);
     Serial.print('\n');
     bool decode_flag = message_decode(message);
-    return decode_flag;
   }
-  return false;
 }
 
 void print_order_state() {
@@ -278,13 +323,18 @@ void print_order_state() {
   for(int axis_i = 0; axis_i < 3; axis_i++) {
     Serial.print("A:");
     Serial.print(axis_i);
-    Serial.print("SG:");
-    Serial.print(steps_goal_distance[axis_i]);
-    Serial.print("SD:");
+    Serial.print(" SG:");
+    Serial.print(steps_fraction_residue[axis_i]);
+    Serial.print(" SD:");
     Serial.print(steps_done[axis_i]);
     Serial.print('|');
   }
+  Serial.print("SCR: ");
+  unsigned int max_steps_remainning = max(steps_remainning[0],  steps_remainning[1]);
+  max_steps_remainning =     max(max_steps_remainning, steps_remainning[2]);
+  Serial.print(max_steps_remainning);
   Serial.print("]\n");
 }
 
 //##################### Global Methods - End #####################
+
