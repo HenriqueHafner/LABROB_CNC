@@ -61,7 +61,8 @@ void setup() {
 
 void loop() { 
   serial_incoming_message_parser();
-  print_order_state();
+  //print_order_state();
+  print_machine_status();
   step_handler();
   delay(10);
 }
@@ -237,7 +238,7 @@ void idle_interval_update(bool debug=false) {
 }
 
 void setup_steps_planning() {
-  set_inital_values();
+  set_zero_steps_done();
   set_axis_carrier();
   set_carrier_tangent_relation();
   set_steps_remainning();
@@ -303,6 +304,9 @@ void step_axis(int axis_i) {
 }
 
 void serial_incoming_message_parser() {
+  if (motion_idle != true){
+    return;
+  }
   serial_bytes_in_buffer = Serial.available();
   if (serial_bytes_in_buffer > 0) {
     message = Serial.readStringUntil('\n');
@@ -334,6 +338,20 @@ void print_order_state() {
   max_steps_remainning =     max(max_steps_remainning, steps_remainning[2]);
   Serial.print(max_steps_remainning);
   Serial.print("]\n");
+}
+
+void print_machine_status() {
+ if (millis() - monitor_last_timestamp <= 1000) {
+   return;
+ }
+ monitor_last_timestamp = millis();
+ if (motion_idle){
+  Serial.print("Idle   "); 
+ } else {
+  Serial.print("Moving "); 
+ }
+  Serial.print("B01 ");
+  Serial.println(Serial.available());
 }
 
 //##################### Global Methods - End #####################
