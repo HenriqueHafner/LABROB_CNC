@@ -49,7 +49,7 @@ void setup() {
   pinMode(dir_pin_z, OUTPUT);
   pinMode(step_pin_z, OUTPUT);
   pinMode(led_pin, OUTPUT);
-  digitalWrite(enable_pin, HIGH);
+  digitalWrite(enable_pin, LOW);
   // Serial
   Serial.begin(9600);
   delay(2000);
@@ -127,6 +127,7 @@ int get_steps_from_string(String message_i, int start_i, int end_i) {
 
 
 void set_steps_to_do(int axis_id, int dir_i, int steps_i){
+  digitalWrite(dir_pin_x, dir_i);
   dir_state[axis_id]  = dir_i;
   steps_goal[axis_id] = steps_i;
 }

@@ -41,7 +41,8 @@ class serialasynchandler_core:
         serial_ports = list_ports.comports()
         for sp in serial_ports:
             hwid = sp.hwid
-            if hwid.find(serial_device) > 0:
+            print("Visible Port: ", hwid)
+            if hwid.find(serial_device) > -1:
                 self.ControllerPortName = sp.name
                 print('Found Serial port for Controler with ', hwid, ' hwid')
                 self.serial_interface = self.serial_module.Serial(port=self.ControllerPortName, timeout=1)
@@ -177,7 +178,7 @@ class serialasynchandler_core:
 
 def tester():
     sc = serialasynchandler_core()
-    sc.bind_serial_device(serial_device='1A86:7523')
+    sc.bind_serial_device(serial_device='USB')
     for i in range(6):
         sc.write_from_towrite_buffer()
         sc.parse_interface_read_buffer()

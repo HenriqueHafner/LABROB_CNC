@@ -13,7 +13,7 @@ class gcode_handler_core:
         self.axis_id =    {'X':0, 'x':0, 'Y':1, 'y':1,'Z':2, 'z':2}
         self.axis_label = {0:'X', 1:'Y', 2:'Z'}
         self.signal_label = {False:'+', True:'-'}
-        self.mm_per_steps = [0.2, 0.2, 0.2]
+        self.mm_per_steps = [0.03125, 0.03125, 0.03125]
 
     def get_lines(self, gcode):
         lines_formated = []

@@ -51,7 +51,7 @@ class GUI():
         print(gcode_text)
         print("...")
         commands = self.machine_core_reference.gcode_parse(gcode_text)
-        print(commands)
+        # print(commands)
         return True
 
     def test_call(self):

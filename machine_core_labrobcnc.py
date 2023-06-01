@@ -34,7 +34,7 @@ class MachineCore:
     def setup_serialinterface(self):
         import serialasynchandler
         self.serial_instance = serialasynchandler.serialasynchandler_core()
-        self.serial_instance.bind_serial_device(serial_device='1A86:7523')
+        self.serial_instance.bind_serial_device(serial_device='USB')
         self.serial_instance.loop_stopped = False
         return True
 
@@ -43,6 +43,7 @@ class MachineCore:
     
     def gcode_parse(self, gcode_text):
         machine_commands = self.gcode_handler_instance.translate_gcode(gcode_text)
+        print(machine_commands)
         self.serial_instance.towrite_buffer_append(machine_commands)
         return True
 
