@@ -22,11 +22,13 @@ class serialasynchandler_core:
         self.ControllerPortName = ''  # Port Name
         self.comunicator_state = 0
         self.settings_dict = dict()
+        self.reciever_buffer_available = 0
+        self.message_size_limit_to_write = 63
 
         self.read_buffer = ''
         self.towrite_buffer = []
         self.msglog_lines = 128
-        self.msglogline = ["",""]
+        self.msglogline = ["Null","Null","Null"]
         self.msglog = list(range(self.msglog_lines))
         for i in range(self.msglog_lines):
             self.msglog[i] = self.msglogline.copy()
@@ -56,15 +58,48 @@ class serialasynchandler_core:
         print('Unable to find a Serial port with ',serial_device,' in hwid')
         return False
     
-    def write_from_towrite_buffer(self):
+    # def write_availability(self):
+    #     last_msglog = self.msglog[self.msglog_ipos-1]
+    #     last_message_label = last_msglog[1]
+    #     label_first_char = last_message_label[0]
+    #     if label_first_char != 'r':
+    #         self.debug_var = label_first_char
+    #         return False
+    #     last_message_id = last_msglog[0]
+    #     if last_message_id == self.reciever_buffer_last_report_id:
+    #         self.debug_var = last_message_id
+    #         return False
+    #     last_message = last_msglog[2]
+    #     buffer_command_index = last_message.find("B01")
+    #     if buffer_command_index <0 :
+    #         self.debug_var = buffer_command_index
+    #         return False
+    #     buffer_available = last_message[buffer_command_index+4:-1]
+    #     if not buffer_available.isnumeric():
+    #         self.debug_var = buffer_available
+    #         return False
+    #     self.reciever_buffer_available = int(buffer_available)
+    #     return True
+
+    def write_from_towrite_buffer(self, check_availability=True):
         if len(self.towrite_buffer) == 0 :
             return False
-        data = self.towrite_buffer.pop(0)
+        data = self.towrite_buffer[0]
+        message_length = len(data)
+        if check_availability:
+            if message_length > self.reciever_buffer_available:
+                return False
         if type(data) is not bytes:
             data = data.encode()
+        if len(data) > self.message_size_limit_to_write:
+            failure_message = "failed to write: message too long"
+            self.messagelog_insert_data(failure_message, label='e:')
+            return False
         try:
             self.serial_interface.write(data) #write data
+            self.towrite_buffer.pop(0)
             self.messagelog_insert_data(data, label='w:')
+            self.reciever_buffer_available -= message_length
             return True
         except:
             failure_message = "serial_interface failed to write"
@@ -74,6 +109,8 @@ class serialasynchandler_core:
                 self.messagelog_insert_data(setup_error, label='e:')
             print('serial_interface failed to write:',data)
             return False
+# machine_core.serial_instance.reciever_buffer_available
+
 
     def parse_interface_read_buffer(self):
         counter_bytes_to_read = self.serial_interface.inWaiting()
@@ -103,6 +140,11 @@ class serialasynchandler_core:
         if messages_found == []:
             return False
         for message in messages_found:
+            if message[:3] == "B01":
+                try:
+                    self.reciever_buffer_available = int(message[4:-1])
+                except:
+                    None
             self.messagelog_insert_data(message, label = 'r: ')
         return True
 
@@ -121,17 +163,15 @@ class serialasynchandler_core:
         self.msglog_mcounter = self.msglog_mcounter + 1
         if self.msglog_mcounter >= 2000:
             self.msglog_mcounter = 1001
-        counter = str(self.msglog_mcounter)
-        counter = counter[-3:]
+        counter = self.msglog_mcounter
         label = label[:5]
-        prefix = counter+' '+label
         if type(message) is bytes:
             message = message.decode()
         if len(message) >= 65:
             message = message[:55] + '[...]'
-        self.msglog[self.msglog_ipos] = [prefix,message]
+        self.msglog[self.msglog_ipos] = [counter, label,message]
         self.msglog_ipos += 1
-        if self.msglog_ipos >= self.msglog_lines-1:  #preventing out of range index
+        if self.msglog_ipos > self.msglog_lines-1:  #preventing out of range index
             self.msglog_ipos = 0
         return True
     
@@ -186,6 +226,7 @@ def tester():
     print(sc.msglog[:20])
     return True
 
+# machine_core.serial_instance.debug_var
 
 
 

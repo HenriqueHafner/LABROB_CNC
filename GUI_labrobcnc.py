@@ -42,17 +42,14 @@ class GUI():
         messages_window_raw = self.machine_core_reference.get_messagelog_window()
         messages_window = list(range(20))
         for i in range(20):
-            messages_window[i] = messages_window_raw[i][0] + messages_window_raw[i][1]
+            messages_window[i] = str(messages_window_raw[i][0])[1:] + ' ' + messages_window_raw[i][1] + messages_window_raw[i][2]
         return messages_window
 
     def str_gcode_parse_gui(self):
         gcode_text = self.eel.get_inputfield_data()()
-        print("parsing...")
-        print(gcode_text)
-        print("...")
-        commands = self.machine_core_reference.gcode_parse(gcode_text)
-        print(commands)
-        return True
+        print("parsing string:", gcode_text)
+        status_flag = self.machine_core_reference.gcode_parse(gcode_text)
+        return status_flag
 
     def test_call(self):
         print("JavasScript asked for a handshake, proceeding to handshake.")

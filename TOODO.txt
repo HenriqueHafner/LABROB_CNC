@@ -1,1 +1,6 @@
-call da função errada
+Hardware:
+Ligar conectores fonte 12V
+Aparafusar tudo num mdf
+Fio para Extensão
+Tomada extensão
+adaptador para tomada do labrob

@@ -6,7 +6,7 @@
 #define step_pin_y 7
 #define step_pin_z 11
 #define enable_pin 8
-#define led_pin 13
+#define led_pin 9
 #define analog_pot_1 A1
 
 //Global Variables
@@ -16,6 +16,9 @@ int step_max_interv = 100;
 int step_curr_interv = 0;
 unsigned int serial_bytes_in_buffer = 0;
 int trimpot_1 = 512;
+int sine_values[10];
+int sine_values_length  = sizeof(sine_values);
+
 
   //movement
 bool able_to_step = true;
@@ -53,6 +56,7 @@ void setup() {
   digitalWrite(enable_pin, HIGH);
   // Serial
   Serial.begin(9600);
+  //compute_wave_values();
   delay(2000);
   Serial.println("CNC Controller Interface: Online");
   // Testing
@@ -311,10 +315,8 @@ void serial_incoming_message_parser() {
   if (serial_bytes_in_buffer > 0) {
     message = Serial.readStringUntil('\n');
     serial_bytes_in_buffer = Serial.available();
-    Serial.print("B01 ");
-    Serial.print(serial_bytes_in_buffer);
-    Serial.print('\n');
     bool decode_flag = message_decode(message);
+    write_buffer_state();
   }
 }
 
@@ -340,6 +342,14 @@ void print_order_state() {
   Serial.print("]\n");
 }
 
+void write_buffer_state() {
+  Serial.print("B01 ");
+  Serial.print(63-Serial.available());
+  Serial.print('\n');
+}
+
+//Auxiliar methods
+
 void print_machine_status() {
  if (millis() - monitor_last_timestamp <= 1000) {
    return;
@@ -350,9 +360,24 @@ void print_machine_status() {
  } else {
   Serial.print("Moving "); 
  }
-  Serial.print("B01 ");
-  Serial.println(Serial.available());
+ Serial.print('\n');
+
+ write_buffer_state();
+
+}
+
+void compute_wave_values() {
+  for ( int index = 0 ; index <= sine_values_length ; index++) {
+    float proportional_time_step = float(index) / float(sine_values_length);
+    float sine_period_step = proportional_time_step * 2*3.1416 ;
+    int sine_value_at_step = 512 + sin(sine_period_step)*512;
+    sine_values[index] = sine_value_at_step;
+    Serial.println(sine_value_at_step); 
+  }
+}
+
+void feedback_led_iterate() {
+  
 }
 
 //##################### Global Methods - End #####################
-
