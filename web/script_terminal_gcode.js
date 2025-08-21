@@ -3,14 +3,19 @@ class terminal_gcode {
         this.id_parent_label = "terminal_gcode";
         this.div_main = document.getElementById("div_".concat(this.id_parent_label));
         this.setup_html_message_console();
-        this.setup_html_inputfield();  
+        this.setup_html_inputfield();
+
+        this.create_canvas();
+        // this.create_textarea();
+        this.create_button();
+
     }
 
     setup_html_message_console() {
         this.canvas = document.createElement("CANVAS");
         this.canvas.id = "canvas_".concat(this.id_parent_label);
-        this.canvas.width  = 500;
-        this.canvas.height = 410;
+        this.canvas.width  = 505;
+        this.canvas.height = 515;
         this.ctx = this.canvas.getContext("2d");
         this.div_main.appendChild(this.canvas);
         this.message_console_timestamp = Date.now()
@@ -85,8 +90,131 @@ class terminal_gcode {
         }
     }
 
-}
+    create_canvas() {
+        this.canvas_lines = document.createElement("canvas");
+        this.canvas_lines.id = "canvas_lines_" + this.id_parent_label;
+        this.canvas_lines.width = 505;
+        this.canvas_lines.height = 515;
+        // this.canvas_lines.style.border = "1px solid black";
+        this.canvas_lines.style.backgroundColor = "#ebeeff'";
+        this.ctx_lines = this.canvas_lines.getContext("2d");
+        this.div_main.appendChild(this.canvas_lines);
+    }
 
+    create_textarea() {
+        this.textarea = document.createElement("textarea");
+        this.textarea.id = "textarea_" + this.id_parent_label;
+        this.textarea.rows = 8;
+        this.textarea.cols = 50;
+        this.textarea.value = "G00 X0 Y0\nG01 X50 Y0\nG01 X50 Y50\nG01 X0 Y50\nG01 X0 Y0";
+        this.div_main.appendChild(this.textarea);
+    }
+
+    create_button() {
+        this.button = document.createElement("button");
+        this.button.innerText = "Desenhar GCODE";
+        this.button.style.display = "block";  // força a quebra de linha
+        this.button.style.marginTop = "10px"; // opcional, espaçamento
+        this.button.style.margin = "10px auto"
+        this.button.onclick = () => this.draw_gcode();
+        this.div_main.appendChild(this.button);
+    }
+
+    draw_gcode() {
+        this.ctx_lines.setTransform(1, 0, 0, 1, 0, 0); // reset transform
+        this.ctx_lines.clearRect(0, 0, this.canvas_lines.width, this.canvas_lines.height);
+
+        let input_text = this.input_field_html.contentDocument.getElementById("lined_input");
+        let str_gcode_message = input_text.value;
+        let linhas = str_gcode_message.split("\n");
+
+        let xAtual = 0, yAtual = 0;
+        let xNovo = 0, yNovo = 0;
+
+        // // Primeiro: determinar os limites máximos de deslocamento
+        // let minX = 0, maxX = 0, minY = 0, maxY = 0;
+
+        // for (let i = 0; i < linhas.length; i++) {
+        //     let linha = linhas[i].trim();
+        //     if (linha === "") continue;
+        //     if (linha.startsWith("G00") || linha.startsWith("G01")) {
+        //         let xIndex = linha.indexOf("X");
+        //         let yIndex = linha.indexOf("Y");
+
+        //         if (xIndex !== -1) {
+        //             let xStr = linha.substring(xIndex + 1).split(" ")[0];
+        //             xNovo += parseFloat(xStr);
+        //         }
+
+        //         if (yIndex !== -1) {
+        //             let yStr = linha.substring(yIndex + 1).split(" ")[0];
+        //             yNovo += parseFloat(yStr);
+        //         }
+
+        //         if (!isNaN(xNovo)) {
+        //             minX = Math.min(minX, xNovo);
+        //             maxX = Math.max(maxX, xNovo);
+        //         }
+        //         if (!isNaN(yNovo)) {
+        //             minY = Math.min(minY, yNovo);
+        //             maxY = Math.max(maxY, yNovo);
+        //         }
+        //     }
+        // }
+
+        // // Dimensões do conteúdo
+        // let contentWidth = maxX - minX;
+        // let contentHeight = maxY - minY;
+
+        // let content_x_center = (maxX + minX)/2;
+        // let content_y_center = (maxY + minY)/2;
+
+        // // Fator de escala baseado na menor razão entre canvas e conteúdo
+        // let scaleX = Math.abs(contentWidth / this.canvas_lines.width);
+        // let scaleY = Math.abs(contentHeight / this.canvas_lines.height);
+        // let scale = 0.9*Math.min(scaleX, scaleY);
+        // // scale = 10;
+
+        // Centraliza o conteúdo no canvas e aplica a escala
+        this.ctx_lines.translate(this.canvas_lines.width/2, this.canvas_lines.width/2);
+        this.ctx_lines.scale(1, 1);
+
+        // Segundo loop: desenhar
+        xAtual = 0;
+        yAtual = 0;
+        xNovo = 0;
+        yNovo = 0;
+
+        for (let i = 0; i < linhas.length; i++) {
+            let linha = linhas[i].trim();
+            if (linha === "") continue;
+            if (linha.startsWith("G00") || linha.startsWith("G01")) {
+                let xIndex = linha.indexOf("X");
+                let yIndex = linha.indexOf("Y");
+
+                if (xIndex !== -1) {
+                    let xStr = linha.substring(xIndex + 1).split(" ")[0];
+                    xNovo = xAtual + parseFloat(xStr);
+                }
+
+                if (yIndex !== -1) {
+                    let yStr = linha.substring(yIndex + 1).split(" ")[0];
+                    yNovo = yAtual + parseFloat(yStr);
+                }
+
+                this.ctx_lines.beginPath();
+                this.ctx_lines.moveTo(xAtual, yAtual); // eixo Y invertido
+                this.ctx_lines.lineTo(xNovo, yNovo);
+                this.ctx_lines.strokeStyle = linha.startsWith("G00") ? "red" : "blue";
+                this.ctx_lines.stroke();
+
+                xAtual = xNovo;
+                yAtual = yNovo;
+            }
+        }
+
+    }
+}
 
 var obj_terminal_gcode = new terminal_gcode();
 function get_inputfield_data() {

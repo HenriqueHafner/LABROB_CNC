@@ -35,7 +35,7 @@ function view_container_create(id_parent_label) {
 
 //Main Routine
 
-view_container_create("empty_tester")
+//view_container_create("empty_tester")
 view_container_create("terminal_gcode")
 //view_container_create("monitor_machine")
 

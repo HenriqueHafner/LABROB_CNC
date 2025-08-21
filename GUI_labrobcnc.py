@@ -34,7 +34,7 @@ class GUI():
     def buttons_teminal_gcode(self):
         buttons_data = [
             ["Enviar Linhas para controlador", "str_gcode_parse_gui()"],
-            ["Do a test call", "test_call()"],
+            ["Testar comunicação", "test_call()"],
             ]
         return buttons_data
     
@@ -67,4 +67,4 @@ class GUI():
             return error_return
 
 # GUI_instance = GUI()
-# GUI_instance.run_webserver()
+# GUI_instance.run_eel_webserver()

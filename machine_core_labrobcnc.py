@@ -27,7 +27,8 @@ class MachineCore:
         import GUI_labrobcnc
         self.GUI_instance = GUI_labrobcnc.GUI()
         self.GUI_instance.set_core_reference(self)
-        self.GUI_instance.run_webserver_thread()
+        self.GUI_instance.run_eel_webserver()
+        # self.GUI_instance.run_webserver_thread()
         self.GUI_running = True
         return True
     

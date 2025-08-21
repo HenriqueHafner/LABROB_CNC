@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Visualizador de GCODE</title>
+  <style>
+    #canvas {
+      border: 1px solid black;
+      background-color: #f0f0f0;
+    }
+    textarea {
+      width: 400px;
+      height: 150px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Digite seu GCODE:</h2>
+  <textarea id="gcodeInput">
+G00 X0 Y0
+G01 X50 Y0
+G01 X50 Y50
+G01 X0 Y50
+G01 X0 Y0
+  </textarea>
+  <br>
+  <button onclick="desenharGcode()">Desenhar</button>
+
+  <h2>Gráfico de deslocamento</h2>
+  <canvas id="canvas" width="400" height="400"></canvas>
+
+  <script>
+    // Função principal chamada ao clicar no botão
+    function desenharGcode() {
+      // Obtemos o canvas e o contexto de desenho 2D
+      var canvas = document.getElementById("canvas");
+      var ctx = canvas.getContext("2d");
+
+      // Limpamos o canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Movemos o sistema de coordenadas para o centro do canvas
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+
+      // Lemos o conteúdo do textarea e dividimos em linhas
+      var linhas = document.getElementById("gcodeInput").value.split("\n");
+
+      // Variáveis para armazenar a posição atual
+      var xAtual = 0;
+      var yAtual = 0;
+
+      // Para cada linha de GCODE
+      for (var i = 0; i < linhas.length; i++) {
+        var linha = linhas[i].trim(); // remove espaços nas pontas
+
+        // Ignoramos linhas vazias
+        if (linha === "") continue;
+
+        // Só processamos comandos G00 ou G01
+        if (linha.startsWith("G00") || linha.startsWith("G01")) {
+          // Procuramos os valores X e Y na linha
+          var xIndex = linha.indexOf("X");
+          var yIndex = linha.indexOf("Y");
+
+          var xNovo = xAtual;
+          var yNovo = yAtual;
+
+          if (xIndex !== -1) {
+            // Captura o número depois do X
+            var xStr = linha.substring(xIndex + 1).split(" ")[0];
+            xNovo = parseFloat(xStr);
+          }
+
+          if (yIndex !== -1) {
+            var yStr = linha.substring(yIndex + 1).split(" ")[0];
+            yNovo = parseFloat(yStr);
+          }
+
+          // Desenha uma linha da posição atual até a nova
+          ctx.beginPath();
+          ctx.moveTo(xAtual, -yAtual); // invertendo Y para coordenada gráfica
+          ctx.lineTo(xNovo, -yNovo);
+          ctx.strokeStyle = linha.startsWith("G00") ? "red" : "blue";
+          ctx.stroke();
+
+          // Atualiza a posição atual
+          xAtual = xNovo;
+          yAtual = yNovo;
+        }
+      }
+
+      // Restauramos o sistema de coordenadas
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform
+    }
+  </script>
+
+</body>
+</html>
