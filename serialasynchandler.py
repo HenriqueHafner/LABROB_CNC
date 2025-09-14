@@ -5,7 +5,7 @@ Created on Tue Oct 22 18:22:17 2022
 @author: henrique hafner
 """
 import time
-import serial
+import serial # type: ignore
 import threading
 
 class serialasynchandler_core:
@@ -20,7 +20,6 @@ class serialasynchandler_core:
         self.bind_status = False
         self.serial_interface = object  # var will be further overwrited with serial comunmicator instance
         self.ControllerPortName = ''  # Port Name
-        self.comunicator_state = 0
         self.settings_dict = dict()
         self.reciever_buffer_available = 0
         self.message_size_limit_to_write = 63
@@ -28,7 +27,7 @@ class serialasynchandler_core:
         self.read_buffer = ''
         self.towrite_buffer = []
         self.msglog_lines = 128
-        self.msglogline = ["Null","Null","Null"]
+        self.msglogline = ["","",""]
         self.msglog = list(range(self.msglog_lines))
         for i in range(self.msglog_lines):
             self.msglog[i] = self.msglogline.copy()
@@ -36,10 +35,9 @@ class serialasynchandler_core:
         self.msglog_mcounter = 1000  # message counter
         self.loop_stopped = True
         self.loop_events_thread = threading.Thread(name='serial_loop_events', target=self.loop_events)
-        self.loop_events_thread.start()
 
     def bind_serial_device(self, serial_device:str):
-        from serial.tools import list_ports
+        from serial.tools import list_ports #type: ignore
         serial_ports = list_ports.comports()
         for sp in serial_ports:
             hwid = sp.hwid
@@ -110,8 +108,8 @@ class serialasynchandler_core:
                 self.messagelog_insert_data(setup_error, label='e:')
             print('serial_interface failed to write:',data)
             return False
-# machine_core.serial_instance.reciever_buffer_available
 
+# machine_core.serial_instance.reciever_buffer_available
 
     def parse_interface_read_buffer(self):
         counter_bytes_to_read = self.serial_interface.inWaiting()
@@ -195,7 +193,7 @@ class serialasynchandler_core:
     
     def loop_events(self):
         while True:
-            if not self.loop_stopped:
+            if not self.loop_stopped and self.bind_status:
                 self.write_from_towrite_buffer()
                 self.parse_interface_read_buffer()
                 self.parse_messages_from_async_buffer()
