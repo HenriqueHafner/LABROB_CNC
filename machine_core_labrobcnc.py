@@ -55,3 +55,4 @@ class MachineCore:
             return False
 
 machine_core = MachineCore()
+input()

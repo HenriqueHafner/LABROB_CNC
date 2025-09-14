@@ -6,6 +6,7 @@ class terminal_gcode {
         this.setup_html_inputfield();
 
         this.create_canvas();
+        this.draw_axes();
         this.create_button();
     }
 

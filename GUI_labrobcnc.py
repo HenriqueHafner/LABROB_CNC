@@ -4,6 +4,16 @@
 
 import threading
 
+import os
+import sys
+
+folder_path = "web"
+absolute_path = os.path.abspath(os.path.join(os.getcwd(), folder_path))
+sys.path.append(absolute_path)
+
+# Exemplo de uso
+add_to_path('sua_pasta')
+
 class GUI():
     
     def __init__(self):
